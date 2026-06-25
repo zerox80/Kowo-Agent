@@ -2,7 +2,7 @@
   "name": "hardview",
   "version": "1.0.0",
   "private": true,
-  "description": "HardView — Hardware-Inventar & Asset-Zuordnung (Kowobau IT)",
+  "description": "HardView — Hardware-Inventar & Asset-Zuordnung",
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",

@@ -74,7 +74,7 @@ pub(super) fn last_seen_text(days: Option<i64>) -> String {
     }
 }
 /// Leitet die Abteilung aus dem Hostnamen ab (Schema WS-<ABT>-NN).
-/// Heuristik fuer Kowobau; per AD-Department spaeter ueberschreibbar.
+/// Heuristik (Schema WS-<ABT>-NN); per AD-Department spaeter ueberschreibbar.
 pub(super) fn dept_from_host(host: &str) -> String {
     let up = host.to_uppercase();
     let map = [

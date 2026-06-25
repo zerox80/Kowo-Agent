@@ -272,11 +272,11 @@ fn current_user_domain() -> (String, String) {
     let user = std::env::var("USERNAME").unwrap_or_else(|_| "Unbekannt".into());
     let domain = std::env::var("USERDNSDOMAIN")
         .or_else(|_| std::env::var("USERDOMAIN"))
-        .unwrap_or_else(|_| "kowobau.local".into())
+        .unwrap_or_else(|_| "corp.local".into())
         .to_lowercase();
     let full = format!(
         "{}\\{}",
-        std::env::var("USERDOMAIN").unwrap_or_else(|_| "KOWOBAU".into()),
+        std::env::var("USERDOMAIN").unwrap_or_else(|_| "CORP".into()),
         user
     );
     (full, domain)

@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Kowobau Hardware-Inventar-Agent. Erhebt einmalig Hardware-/Asset-Metadaten des
+    HardView Hardware-Inventar-Agent. Erhebt einmalig Hardware-/Asset-Metadaten des
     lokalen PCs und legt sie als JSON-Datei auf dem Inventar-Share ab.
 
 .DESCRIPTION
@@ -41,7 +41,7 @@ param(
     [string] $OutputDir = '\\FILESERVER\Inventory$\incoming',
     [switch] $Local,
     [switch] $PassThru,
-    [string] $LogDir = (Join-Path $env:ProgramData 'Kowobau\HardwareInventar')
+    [string] $LogDir = (Join-Path $env:ProgramData 'HardView\agent')
 )
 
 $ErrorActionPreference = 'Stop'

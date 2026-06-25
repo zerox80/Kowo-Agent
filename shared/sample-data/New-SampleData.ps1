@@ -69,7 +69,7 @@ foreach ($p in $pcs) {
     $obj = [ordered]@{
         schemaVersion=1; agentVersion='1.0.0'
         collectedAtUtc=$collected.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        hostname=$p.h; domain='kowobau.local'
+        hostname=$p.h; domain='corp.local'
         currentUser=("KOWOBAU\{0}.{1}" -f $p.f, $p.l); lastLoggedOnUser=("KOWOBAU\{0}.{1}" -f $p.f, $p.l)
         chassis=$(if ($p.mdl -match 'ThinkPad|Carbon|Laptop|Book') {'Laptop'} else {'Desktop'})
         manufacturer=$p.mfg; model=$p.mdl; serialNumber=('SN' + ($p.h -replace '\W','').Substring([math]::Max(0,($p.h -replace '\W','').Length-6)))

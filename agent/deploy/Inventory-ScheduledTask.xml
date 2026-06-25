@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-16"?>
 <!--
-  Kowobau HardView — Inventar-Agent (GPO-Vorlage fuer Task Scheduler 1.2)
+  HardView — Inventar-Agent (GPO-Vorlage fuer Task Scheduler 1.2)
 
-  Import:  schtasks /Create /TN "Kowobau\HardwareInventar" /XML Inventory-ScheduledTask.xml /RU SYSTEM
+  Import:  schtasks /Create /TN "HardView\HardwareInventar" /XML Inventory-ScheduledTask.xml /RU SYSTEM
   oder per GPP: Computerkonfiguration > Einstellungen > Geplante Aufgaben > Neu > "Geplante Aufgabe (Windows Vista+)"
                 und die Werte aus dieser Datei uebernehmen.
 
   VOR DEM IMPORT ANPASSEN (zwei Platzhalter in <Arguments>):
-    1) Skriptquelle:  \\kowobau.local\NETLOGON\HardView\Invoke-Inventory.ps1   (von SYSTEM/Domaenen-Computern lesbar)
+    1) Skriptquelle:  \\YOUR_DOMAIN.local\NETLOGON\HardView\Invoke-Inventory.ps1   (von SYSTEM/Domaenen-Computern lesbar)
     2) Inventar-Ziel: \\FILESERVER\Inventory$\incoming                         (UNC! KEIN G:\ — SYSTEM hat keine gemappten Laufwerke)
 
   Der Task laeuft als SYSTEM; der Share-Zugriff erfolgt als Computerkonto (DOMAENE\PC$),
@@ -19,9 +19,9 @@
 -->
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>Kowobau IT-Asset-Management: woechentliche Hardware-Inventarisierung (nur Hardware-Metadaten, kein Nutzer-Tracking).</Description>
-    <Author>Kowobau IT</Author>
-    <URI>\Kowobau\HardwareInventar</URI>
+    <Description>HardView IT-Asset-Management: woechentliche Hardware-Inventarisierung (nur Hardware-Metadaten, kein Nutzer-Tracking).</Description>
+    <Author>HardView</Author>
+    <URI>\HardView\HardwareInventar</URI>
   </RegistrationInfo>
   <Triggers>
     <CalendarTrigger>
@@ -64,7 +64,7 @@
   <Actions Context="Author">
     <Exec>
       <Command>%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe</Command>
-      <Arguments>-NoProfile -NonInteractive -ExecutionPolicy AllSigned -WindowStyle Hidden -File "\\kowobau.local\NETLOGON\HardView\Invoke-Inventory.ps1" -OutputDir "\\FILESERVER\Inventory$\incoming"</Arguments>
+      <Arguments>-NoProfile -NonInteractive -ExecutionPolicy AllSigned -WindowStyle Hidden -File "\\YOUR_DOMAIN.local\NETLOGON\HardView\Invoke-Inventory.ps1" -OutputDir "\\FILESERVER\Inventory$\incoming"</Arguments>
     </Exec>
   </Actions>
 </Task>

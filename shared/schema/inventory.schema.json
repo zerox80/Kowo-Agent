@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://kowobau.local/schema/inventory.schema.json",
-  "title": "Kowobau Hardware-Inventar (pro Geraet)",
+  "$id": "https://github.com/zerox80/Kowo-Agent/raw/main/shared/schema/inventory.schema.json",
+  "title": "HardView Hardware-Inventar (pro Geraet)",
   "description": "Eine vom Inventar-Agent je PC erzeugte JSON-Datei (<hostname>.json) auf dem Inventar-Share.",
   "type": "object",
   "additionalProperties": true,

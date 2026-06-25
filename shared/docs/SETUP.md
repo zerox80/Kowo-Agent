@@ -13,7 +13,7 @@
 
 ## B. Agent ausrollen
 Siehe [`agent/deploy/README-Deployment.md`](../../agent/deploy/README-Deployment.md):
-`Invoke-Inventory.ps1` nach `\\kowobau.local\NETLOGON\HardView\` kopieren, GPO-Task (SYSTEM, wöchentlich,
+`Invoke-Inventory.ps1` nach `\\YOUR_DOMAIN.local\NETLOGON\HardView\` kopieren, GPO-Task (SYSTEM, wöchentlich,
 ausgeblendet, Zufallsverzögerung) verteilen, Ziel = **UNC** (`\\FILESERVER\Inventory$\incoming`, nicht `G:`).
 Verifizieren über `agent.log` und die erzeugte `<hostname>.json`.
 
@@ -38,7 +38,7 @@ Verifizieren über `agent.log` und die erzeugte `<hostname>.json`.
 - `adEnabled: true` setzen (in `config.json` oder in der App unter **Einstellungen**). Die App ruft
   `Get-AdUsers.ps1` (eingebettet) per integrierter Auth auf —
   **kein RSAT** nötig, read-only. Liefert Name/Abteilung/Mail für den Zuordnungs-Dialog.
-- Voraussetzung: Der IT-Rechner hat Sicht auf einen `kowobau.local`-DC (im LAN/VPN).
+- Voraussetzung: Der IT-Rechner hat Sicht auf einen `YOUR_DOMAIN.local`-DC (im LAN/VPN).
 - Ist AD nicht erreichbar oder `adEnabled:false`, fällt die Benutzerauswahl automatisch auf die
   eindeutigen Namen aus CSV/Inventar zurück (App bleibt funktionsfähig).
 

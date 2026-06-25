@@ -91,7 +91,7 @@
       gpus: ['Intel UHD Graphics'], ip: '10.4.' + (10 + (pc.h.length % 8)) + '.' + (20 + pc.h.length), mac: '00:1A:2B:3C:4D:5E',
       installDate: null, lastBoot: null, tpm: pc.os.includes('11'), secureBoot: pc.os.includes('11'),
       ramSticks: Array.from({ length: pc.su }, (_, i) => ({ capacityGB: Math.round(pc.ram / pc.su), speedMhz: 3200, slot: 'DIMM' + i })),
-      note: pc.assigned ? 'Gerät nach Abteilungswechsel bestätigt.' : '', confirmedBy: pc.assigned ? 'KOWOBAU\\T.Administrator' : null,
+      note: pc.assigned ? 'Gerät nach Abteilungswechsel bestätigt.' : '', confirmedBy: pc.assigned ? 'CORP\\T.Administrator' : null,
       collectedAtUtc: hasInv ? new Date(Date.now() - pc.stale * 864e5).toISOString() : null
     };
   }
@@ -142,7 +142,7 @@
     d.userSource = 'manuell bestätigt';
     d.dept = args.userDept || d.dept;
     d.note = args.note || '';
-    d.confirmedBy = 'KOWOBAU\\T.Administrator';
+    d.confirmedBy = 'CORP\\T.Administrator';
     d.initials = (d.userDisplay.split(' ').map(s => s[0]).join('').slice(0, 2)).toUpperCase();
     return d;
   }
@@ -151,11 +151,11 @@
     return PCS.map(compute).map(d => applyAssignment(d, ASSIGN[d.host]));
   }
 
-  const AD_USERS = PCS.map(p => ({ sam: (p.f + '.' + p.l).toLowerCase(), display: p.f + ' ' + p.l, dept: p.d, mail: (p.f + '.' + p.l).toLowerCase() + '@kowobau.de' }))
+  const AD_USERS = PCS.map(p => ({ sam: (p.f + '.' + p.l).toLowerCase(), display: p.f + ' ' + p.l, dept: p.d, mail: (p.f + '.' + p.l).toLowerCase() + '@example.com' }))
     .concat([
-      { sam: 'a.berger', display: 'Anna Berger', dept: 'Marketing', mail: 'a.berger@kowobau.de' },
-      { sam: 'm.fischer', display: 'Martin Fischer', dept: 'IT', mail: 'm.fischer@kowobau.de' },
-      { sam: 's.weber', display: 'Sophie Weber', dept: 'Personal', mail: 's.weber@kowobau.de' }
+      { sam: 'a.berger', display: 'Anna Berger', dept: 'Marketing', mail: 'a.berger@example.com' },
+      { sam: 'm.fischer', display: 'Martin Fischer', dept: 'IT', mail: 'm.fischer@example.com' },
+      { sam: 's.weber', display: 'Sophie Weber', dept: 'Personal', mail: 's.weber@example.com' }
     ]);
 
   const ASSIGN = {};
@@ -203,7 +203,7 @@
         }
         case 'refresh': THRESH = normalizeThresholds(SETTINGS.thresholds, THRESH); DEVICES = rebuildDevices(); return { ok: true, count: DEVICES.length };
         case 'export_devices': return { ok: true, path: '(Vorschau) export.csv', rows: DEVICES.length };
-        case 'me': return { name: 'T. Administrator', initials: 'TA', domain: 'kowobau.local' };
+        case 'me': return { name: 'T. Administrator', initials: 'TA', domain: 'corp.local' };
         default: throw new Error('Unbekannter Mock-Befehl: ' + cmd);
       }
     }

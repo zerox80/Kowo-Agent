@@ -130,7 +130,7 @@ fn write_assignment_validates_known_host_and_persists_dept() {
     let err = write_assignment(
         &cfg,
         "WS-UNKNOWN-01",
-        "KOWOBAU\\ghost",
+        "CORP\\ghost",
         "Ghost User",
         "IT",
         "",
@@ -142,7 +142,7 @@ fn write_assignment_validates_known_host_and_persists_dept() {
     write_assignment(
         &cfg,
         "ws-known-01",
-        "KOWOBAU\\jsmith",
+        "CORP\\jsmith",
         "Jane Smith",
         "IT",
         "confirmed",
@@ -152,7 +152,7 @@ fn write_assignment_validates_known_host_and_persists_dept() {
 
     let store = read_assignments(cfg.assignments_path.as_deref().unwrap());
     let entry = store.assignments.get("WS-KNOWN-01").unwrap();
-    assert_eq!(entry.user, "KOWOBAU\\jsmith");
+    assert_eq!(entry.user, "CORP\\jsmith");
     assert_eq!(entry.user_display, "Jane Smith");
     assert_eq!(entry.dept, "IT");
     assert_eq!(entry.note, "confirmed");
