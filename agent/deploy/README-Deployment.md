@@ -40,7 +40,7 @@ Der Agent muss per GPO daher mit einem **UNC-Pfad** als Ziel laufen:
 Lege `Invoke-Inventory.ps1` an einen Ort, den **Domänen-Computer lesen** können — ideal:
 
 ```
-\\kowobau.local\NETLOGON\HardView\Invoke-Inventory.ps1
+\\YOUR_DOMAIN.local\NETLOGON\HardView\Invoke-Inventory.ps1
 ```
 
 (NETLOGON wird automatisch repliziert und ist für alle Computer/Use​r lesbar.)
@@ -54,19 +54,19 @@ Lege `Invoke-Inventory.ps1` an einen Ort, den **Domänen-Computer lesen** könne
 
 **Variante A – XML importieren (pro PC / Test):**
 ```powershell
-schtasks /Create /TN "Kowobau\HardwareInventar" /XML Inventory-ScheduledTask.xml /RU SYSTEM
+schtasks /Create /TN "HardView\HardwareInventar" /XML Inventory-ScheduledTask.xml /RU SYSTEM
 ```
 (Vorher die zwei Platzhalter in `Inventory-ScheduledTask.xml` anpassen: Skriptquelle + `\\FILESERVER\Inventory$\incoming`.)
 
 **Variante B – Gruppenrichtlinie (Massenrollout, empfohlen):**
-1. GPO „Kowobau – HardView Inventar" erstellen, auf die Client-OU verknüpfen.
+1. GPO „HardView Inventar" erstellen, auf die Client-OU verknüpfen.
 2. *Computerkonfiguration → Einstellungen → Systemsteuerungseinstellungen → Geplante Aufgaben*
    → Neu → **Geplante Aufgabe (Windows Vista und höher)**.
 3. Werte gemäß `Inventory-ScheduledTask.xml` setzen:
    - Konto: `NT-AUTORITÄT\SYSTEM`, *Mit höchsten Privilegien*, *Unabhängig von Benutzeranmeldung*, *Ausgeblendet*.
    - Trigger: wöchentlich, So 12:00, **Zufallsverzögerung 4 h** (entzerrt ~776 PCs auf dem Share).
    - Aktion: `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`, Argumente:
-     `-NoProfile -NonInteractive -ExecutionPolicy AllSigned -WindowStyle Hidden -File "\\kowobau.local\NETLOGON\HardView\Invoke-Inventory.ps1" -OutputDir "\\FILESERVER\Inventory$\incoming"`
+     `-NoProfile -NonInteractive -ExecutionPolicy AllSigned -WindowStyle Hidden -File "\\YOUR_DOMAIN.local\NETLOGON\HardView\Invoke-Inventory.ps1" -OutputDir "\\FILESERVER\Inventory$\incoming"`
    - Bedingungen: *Nur bei Netzwerkverbindung*; Akku-Optionen aktiv lassen (Laptops sollen melden).
 
 **Variante C – lokal testen:** `Install-InventoryTask.ps1` (als Admin) registriert die Aufgabe auf einem Einzel-PC.
@@ -75,12 +75,12 @@ schtasks /Create /TN "Kowobau\HardwareInventar" /XML Inventory-ScheduledTask.xml
 
 ```powershell
 # Sofortlauf erzwingen und Ergebnis prüfen
-Start-ScheduledTask -TaskName 'HardwareInventar' -TaskPath '\Kowobau\'
-Get-ScheduledTaskInfo -TaskName 'HardwareInventar' -TaskPath '\Kowobau\'   # LastTaskResult = 0
+Start-ScheduledTask -TaskName 'HardwareInventar' -TaskPath '\HardView\'
+Get-ScheduledTaskInfo -TaskName 'HardwareInventar' -TaskPath '\HardView\'   # LastTaskResult = 0
 # JSON auf dem Share kontrollieren:
 Get-Item "\\FILESERVER\Inventory$\incoming\$env:COMPUTERNAME.json"
 # Lokales Agent-Log:
-Get-Content "$env:ProgramData\Kowobau\HardwareInventar\agent.log" -Tail 20
+Get-Content "$env:ProgramData\HardView\agent\agent.log" -Tail 20
 ```
 Kein Fenster, kein Toast — der Lauf ist für den Mitarbeiter unsichtbar (stört die Arbeit nicht).
 
@@ -102,7 +102,7 @@ Produktiv bleibt `AllSigned`; so führt ein manipuliertes oder untergeschobenes 
 
 ## 7. Transparenz / Datenschutz
 
-Der Agent ist eine **benannte, dokumentierte** IT-Aufgabe (`Kowobau\HardwareInventar`) und erhebt nur
+Der Agent ist eine **benannte, dokumentierte** IT-Aufgabe (`HardView\HardwareInventar`) und erhebt nur
 Hardware-/Bestandsdaten zur Lebenszyklusplanung. Bei Mitbestimmung empfiehlt sich eine kurze
 Information an den Betriebsrat (Zweck: Hardware-Upgrade-Planung; keine Verhaltens-/Leistungskontrolle).
 

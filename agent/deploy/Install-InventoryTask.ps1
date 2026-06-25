@@ -6,7 +6,7 @@
     Fuer lokale Tests/Einzelinstallation. Massenverteilung erfolgt per GPO (siehe README-Deployment.md).
 
 .DESCRIPTION
-    Legt die Aufgabe "Kowobau\HardwareInventar" an:
+    Legt die Aufgabe "HardView\HardwareInventar" an:
       - Trigger: woechentlich, mit Zufallsverzoegerung (entzerrt 776 PCs auf dem Share)
       - Kontext: SYSTEM, ohne Fenster, niedrige Prioritaet
       - laeuft auch ohne angemeldeten Benutzer und auf Akku (Laptops)
@@ -45,7 +45,7 @@ param(
     [datetime] $At = '12:00',
     [int]      $RandomDelayHours = 4,
     [string]   $TaskName = 'HardwareInventar',
-    [string]   $TaskPath = '\Kowobau\',
+    [string]   $TaskPath = '\HardView\',
     [ValidateSet('AllSigned','RemoteSigned')]
     [string]   $ExecutionPolicy = 'AllSigned',
     [switch]   $AllowUnsignedForTest,
@@ -107,7 +107,7 @@ $settings.Priority = 7
 
 Register-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath `
     -Action $action -Trigger $trigger -Principal $principal -Settings $settings `
-    -Description 'Kowobau IT-Asset-Management: woechentliche Hardware-Inventarisierung (nur Hardware-Metadaten).' `
+    -Description 'HardView IT-Asset-Management: woechentliche Hardware-Inventarisierung (nur Hardware-Metadaten).' `
     -Force | Out-Null
 
 Write-Host "Aufgabe '$TaskPath$TaskName' registriert."

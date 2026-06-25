@@ -1,8 +1,8 @@
 [package]
 name = "hardview"
 version = "1.0.0"
-description = "HardView — Hardware-Inventar (Kowobau IT-Asset-Management)"
-authors = ["Kowobau IT"]
+description = "HardView — Hardware-Inventar & Asset-Zuordnung"
+authors = ["HardView"]
 edition = "2021"
 rust-version = "1.77"
 
