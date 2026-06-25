@@ -62,6 +62,8 @@ npm run dev
 
 **Backend-Tests:** `cd app/src-tauri; cargo test`
 
+**Repo-Checks:** `cd app; npm run check` sowie `cd app/src-tauri; cargo fmt --all -- --check; cargo test --all; cargo clippy --all-targets -- -D warnings`
+
 ## Konfiguration
 
 Reihenfolge: `%APPDATA%\HardView\config.json` → Defaults → **Umgebungsvariablen** (`KOWO_DATA_DIR`,
@@ -92,8 +94,8 @@ Details, Share-ACLs und der SYSTEM-/UNC-Hinweis: [`agent/deploy/README-Deploymen
 | Agent (PowerShell) | ✅ gebaut, auf realem PC getestet (0 Sammelfehler) |
 | JSON-Schema + Sample-Daten | ✅ |
 | Frontend (HardView-Port) | ✅ im Browser verifiziert (Tabelle, KPIs, Drawer, Zuordnung, Dashboard, Einstellungen) |
-| Rust-Backend | ✅ `cargo test` (8 Tests) + `cargo clippy -D warnings` grün; Merge & Bewertung gegen Sample-Daten getestet |
-| CI | ✅ GitHub Actions: fmt + clippy (-D warnings) + Tests (Windows) und JS-Syntaxcheck |
+| Rust-Backend | ✅ `cargo test` (10 Tests) + `cargo clippy -D warnings` grün; Merge & Bewertung gegen Sample-Daten getestet |
+| CI | ✅ GitHub Actions: fmt + clippy (-D warnings) + Tests (Windows), PowerShell-Parser und JS-Syntaxcheck |
 | Tauri-App | ✅ kompiliert, gestartet, zeigt echte Daten (Screenshot in `app/hardview-screenshot.png`) |
 | AD-Lookup | ✅ Code korrekt; Live-Test offen (Build-Laptop ohne DC-Verbindung; Fallback auf CSV greift) |
 | GPO-Deployment-Paket | ✅ Installer + Task-XML + Anleitung |

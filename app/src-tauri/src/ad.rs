@@ -7,17 +7,13 @@ use std::time::{Duration, Instant};
 const SCRIPT: &str = include_str!("../scripts/Get-AdUsers.ps1");
 const AD_QUERY_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// Schreibt das eingebettete Skript in den Temp-Ordner und fuehrt es aus.
+/// Fuehrt das eingebettete Skript ueber PowerShell-stdin aus.
 /// Gibt die geparste Benutzerliste zurueck (alle aktivierten User, in Rust gefiltert).
 pub fn fetch_ad_users() -> Result<Vec<AdUser>, String> {
     use std::io::{Read, Write};
     use std::process::Stdio;
 
-    let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string());
-    let powershell_path = format!(
-        "{}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-        system_root
-    );
+    let powershell_path = system_powershell_path()?;
     let mut cmd = Command::new(powershell_path);
     cmd.args(["-NoProfile", "-NonInteractive", "-Command", "-"]);
     cmd.stdin(Stdio::piped());
@@ -108,3 +104,33 @@ fn no_window(cmd: &mut Command) {
 }
 #[cfg(not(windows))]
 fn no_window(_cmd: &mut Command) {}
+
+#[cfg(windows)]
+fn system_powershell_path() -> Result<std::path::PathBuf, String> {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+
+    extern "system" {
+        fn GetSystemWindowsDirectoryW(lpBuffer: *mut u16, uSize: u32) -> u32;
+    }
+
+    let mut buffer = [0u16; 260];
+    let len = unsafe { GetSystemWindowsDirectoryW(buffer.as_mut_ptr(), buffer.len() as u32) };
+    if len == 0 || len as usize >= buffer.len() {
+        return Err("Windows-Systemverzeichnis konnte nicht ermittelt werden".into());
+    }
+    let path = std::path::PathBuf::from(OsString::from_wide(&buffer[..len as usize]))
+        .join("System32")
+        .join("WindowsPowerShell")
+        .join("v1.0")
+        .join("powershell.exe");
+    if !path.is_file() {
+        return Err(format!("PowerShell nicht gefunden: {}", path.display()));
+    }
+    Ok(path)
+}
+
+#[cfg(not(windows))]
+fn system_powershell_path() -> Result<std::path::PathBuf, String> {
+    Ok(std::path::PathBuf::from("powershell"))
+}

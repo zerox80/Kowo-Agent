@@ -43,6 +43,7 @@
 
   // ---------------- state ----------------
   const state = { view: 'inventar', devices: [], overview: null, settings: null, q: '', filter: 'all', sort: 'host', dir: 'asc', selected: null };
+  const DEFAULT_THRESHOLDS = { minRamGB: 8, maxAgeYears: 5, staleDays: 30, requireSsd: true, minCpuCores: 4, minCpuClockMhz: 0, targetRamGB: 16 };
 
   const VIEWS = {
     inventar:  { title: 'Geräte-Inventar', sub: 'Hardware-Bestand aller Arbeitsplätze · wöchentliche Inventarisierung', list: true, filter: 'all' },
@@ -79,9 +80,11 @@
   }
 
   function visible() {
+    const isUpgradeCandidate = (d) => d.status === 'upgrade' || (d.status === 'stale' && (d.upgradeReasons || []).length > 0);
     let list = state.devices.filter((d) => {
       if (state.filter !== 'all') {
         if (state.filter === 'veraltet') { if (!(d.status === 'stale' || d.status === 'missing')) return false; }
+        else if (state.filter === 'upgrade') { if (!isUpgradeCandidate(d)) return false; }
         else if (d.status !== state.filter) return false;
       }
       if (state.q) {
@@ -131,7 +134,7 @@
     const defs = [
       ['all', 'Alle', o.total],
       ['ok', 'OK', o.status.ok],
-      ['upgrade', 'Upgrade', o.status.upgrade],
+      ['upgrade', 'Upgrade', o.upgradeNeeded],
       ['veraltet', 'Veraltet', o.status.stale + o.status.missing]
     ];
     defs.forEach(([key, label, count]) => {
@@ -168,7 +171,8 @@
     const list = visible();
     if (!list.length) { host.appendChild(el('div', { class: 'empty' }, 'Keine Geräte für diese Filterung.')); return; }
     list.forEach((d) => {
-      const ramPct = Math.min(100, Math.round((d.ramGB / d.ramTargetGB) * 100));
+      const ramTarget = Math.max(1, Number(d.ramTargetGB) || DEFAULT_THRESHOLDS.targetRamGB);
+      const ramPct = Math.min(100, Math.max(0, Math.round((d.ramGB / ramTarget) * 100)));
       const row = el('div', {
         class: 'row grid-cols' + (d.status === 'upgrade' ? ' warn' : '') + (state.selected === d.host ? ' sel' : '') + (d.status === 'stale' || d.status === 'missing' ? ' dim' : ''),
         onclick: () => { state.selected = d.host; renderRows(); renderDrawer(); }
@@ -390,30 +394,38 @@
     }
     const th = c.thresholds || {};
     const txt = (v) => el('input', { class: 'set-input', type: 'text', value: v == null ? '' : String(v), autocomplete: 'off', spellcheck: 'false' });
-    const num = (v, step) => el('input', { class: 'set-input', type: 'number', step: step || '1', min: '0', value: v == null ? '' : String(v), autocomplete: 'off' });
+    const num = (v, step, min) => el('input', { class: 'set-input', type: 'number', step: step || '1', min: min == null ? '0' : String(min), value: v == null ? '' : String(v), autocomplete: 'off' });
     const chk = (v) => { const e = el('input', { class: 'set-check', type: 'checkbox' }); e.checked = !!v; return e; };
     const field = (label, input, hint) => el('div', { class: 'set-field' }, el('label', {}, label), input, hint ? el('div', { class: 'set-hint' }, hint) : null);
 
     const iDataDir = txt(c.dataDir), iCsv = txt(c.masterCsvPath), iAssign = txt(c.assignmentsPath);
     const iAd = chk(c.adEnabled);
-    const iRam = num(th.minRamGB), iAge = num(th.maxAgeYears, '0.1'), iStale = num(th.staleDays);
-    const iCores = num(th.minCpuCores), iClock = num(th.minCpuClockMhz, '100'), iTarget = num(th.targetRamGB);
+    const iRam = num(th.minRamGB), iAge = num(th.maxAgeYears, '0.1', '0.1'), iStale = num(th.staleDays, '1', '1');
+    const iCores = num(th.minCpuCores), iClock = num(th.minCpuClockMhz, '100'), iTarget = num(th.targetRamGB, '1', '1');
     const iSsd = chk(th.requireSsd);
 
     const save = async () => {
+      const intValue = (input, fallback, min) => {
+        const parsed = parseInt(input.value, 10);
+        return Number.isFinite(parsed) ? Math.max(min, parsed) : fallback;
+      };
+      const floatValue = (input, fallback, min) => {
+        const parsed = parseFloat(input.value);
+        return Number.isFinite(parsed) ? Math.max(min, parsed) : fallback;
+      };
       const config = {
         dataDir: iDataDir.value.trim(),
         masterCsvPath: iCsv.value.trim(),
         assignmentsPath: iAssign.value.trim() || null,
         adEnabled: iAd.checked,
         thresholds: {
-          minRamGB: parseInt(iRam.value, 10) || 0,
-          maxAgeYears: parseFloat(iAge.value) || 0,
-          staleDays: parseInt(iStale.value, 10) || 0,
+          minRamGB: intValue(iRam, DEFAULT_THRESHOLDS.minRamGB, 0),
+          maxAgeYears: floatValue(iAge, DEFAULT_THRESHOLDS.maxAgeYears, 0.1),
+          staleDays: intValue(iStale, DEFAULT_THRESHOLDS.staleDays, 1),
           requireSsd: iSsd.checked,
-          minCpuCores: parseInt(iCores.value, 10) || 0,
-          minCpuClockMhz: parseInt(iClock.value, 10) || 0,
-          targetRamGB: parseInt(iTarget.value, 10) || 0
+          minCpuCores: intValue(iCores, DEFAULT_THRESHOLDS.minCpuCores, 0),
+          minCpuClockMhz: intValue(iClock, DEFAULT_THRESHOLDS.minCpuClockMhz, 0),
+          targetRamGB: intValue(iTarget, DEFAULT_THRESHOLDS.targetRamGB, 1)
         }
       };
       try {

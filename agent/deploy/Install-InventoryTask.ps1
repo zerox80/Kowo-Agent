@@ -29,6 +29,9 @@
 .PARAMETER Uninstall
     Entfernt die Aufgabe wieder.
 
+.PARAMETER AllowUnsignedForTest
+    Erlaubt RemoteSigned nur fuer lokale Labortests mit unsigniertem Agent-Skript.
+
 .EXAMPLE
     .\Install-InventoryTask.ps1 -OutputDir '\\fileserver\Inventory$\incoming'
 .EXAMPLE
@@ -45,6 +48,7 @@ param(
     [string]   $TaskPath = '\Kowobau\',
     [ValidateSet('AllSigned','RemoteSigned')]
     [string]   $ExecutionPolicy = 'AllSigned',
+    [switch]   $AllowUnsignedForTest,
     [switch]   $Uninstall
 )
 
@@ -60,11 +64,28 @@ if (-not (Test-Path -LiteralPath $ScriptPath)) {
     throw "Agent-Skript nicht gefunden: $ScriptPath"
 }
 
+if ($ScriptPath -match '"|[\x00-\x1F]' -or $OutputDir -match '"|[\x00-\x1F]') {
+    throw 'ScriptPath und OutputDir duerfen keine Anfuehrungszeichen oder Steuerzeichen enthalten.'
+}
+
 # Der Task laeuft als SYSTEM aus einer Netzwerkfreigabe; AllSigned ist deshalb
-# der sichere Produktions-Default. RemoteSigned nur fuer lokale Tests verwenden.
+# der sichere Produktions-Default. RemoteSigned ist nur mit expliziter Testfreigabe erlaubt.
+if ($ExecutionPolicy -eq 'AllSigned') {
+    $signature = Get-AuthenticodeSignature -LiteralPath $ScriptPath
+    if ($signature.Status -ne 'Valid') {
+        throw ("Agent-Skript ist nicht gueltig signiert ({0}). Fuer lokale Labortests RemoteSigned mit -AllowUnsignedForTest verwenden." -f $signature.Status)
+    }
+} elseif (-not $AllowUnsignedForTest) {
+    throw 'RemoteSigned ist nur mit -AllowUnsignedForTest erlaubt.'
+}
+
 $arg = '-NoProfile -NonInteractive -ExecutionPolicy {0} -WindowStyle Hidden -File "{1}" -OutputDir "{2}"' -f $ExecutionPolicy, $ScriptPath, $OutputDir
 
-$powerShellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$windowsDir = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Windows)
+if ([string]::IsNullOrWhiteSpace($windowsDir)) {
+    throw 'Windows-Verzeichnis konnte nicht ermittelt werden.'
+}
+$powerShellPath = Join-Path $windowsDir 'System32\WindowsPowerShell\v1.0\powershell.exe'
 if (-not (Test-Path -LiteralPath $powerShellPath)) {
     throw "PowerShell nicht gefunden: $powerShellPath"
 }

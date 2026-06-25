@@ -4,7 +4,8 @@
  * In der echten Tauri-App ist window.__TAURI__ vorhanden und dieser Code wird NICHT genutzt.
  * Die Berechnungslogik hier spiegelt store.rs/upgrade.rs wider (Quelle der Wahrheit = Rust). */
 (function () {
-  const THRESH = { minRamGB: 8, maxAgeYears: 5, staleDays: 30, requireSsd: true, minCpuCores: 4, minCpuClockMhz: 0, targetRamGB: 16 };
+  const DEFAULT_THRESHOLDS = { minRamGB: 8, maxAgeYears: 5, staleDays: 30, requireSsd: true, minCpuCores: 4, minCpuClockMhz: 0, targetRamGB: 16 };
+  let THRESH = Object.assign({}, DEFAULT_THRESHOLDS);
   const PALETTE = ['#4f8cff', '#2fd6a6', '#b98cff', '#ff8a4f', '#ffb454', '#5fc9ff', '#ff7a9c', '#7ee081'];
 
   // Roh-PCs (entspricht sample-data). inv=false -> in CSV aber ohne Agent-JSON.
@@ -33,6 +34,26 @@
   function initials(f, l) { return ((f || '?')[0] + (l || '?')[0]).toUpperCase(); }
   function osShort(os, b) { const w = os.includes('11') ? 'Win 11' : os.includes('10') ? 'Win 10' : os; const map = { '22631':'23H2','22621':'22H2','19045':'22H2','19044':'21H2','26100':'24H2','26200':'24H2' }; return w + (map[b] ? ' ' + map[b] : ''); }
   function lastSeen(days) { if (days == null) return '—'; if (days < 1) return 'gerade eben'; if (days === 1) return 'vor 1 Tag'; return 'vor ' + days + ' Tagen'; }
+  function intAtLeast(value, fallback, min) {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.max(min, parsed) : fallback;
+  }
+  function numberAtLeast(value, fallback, min) {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? Math.max(min, parsed) : fallback;
+  }
+  function normalizeThresholds(input, base) {
+    const src = Object.assign({}, base || DEFAULT_THRESHOLDS, input || {});
+    return {
+      minRamGB: intAtLeast(src.minRamGB, DEFAULT_THRESHOLDS.minRamGB, 0),
+      maxAgeYears: numberAtLeast(src.maxAgeYears, DEFAULT_THRESHOLDS.maxAgeYears, 0.1),
+      staleDays: intAtLeast(src.staleDays, DEFAULT_THRESHOLDS.staleDays, 1),
+      requireSsd: !!src.requireSsd,
+      minCpuCores: intAtLeast(src.minCpuCores, DEFAULT_THRESHOLDS.minCpuCores, 0),
+      minCpuClockMhz: intAtLeast(src.minCpuClockMhz, DEFAULT_THRESHOLDS.minCpuClockMhz, 0),
+      targetRamGB: intAtLeast(src.targetRamGB, DEFAULT_THRESHOLDS.targetRamGB, 1)
+    };
+  }
 
   function compute(pc) {
     const hasInv = pc.inv;
@@ -80,13 +101,16 @@
     const withInv = devs.filter(d => d.hasInventory).length;
     const stale = devs.filter(d => d.status === 'stale').length;
     const missing = devs.filter(d => d.status === 'missing').length;
-    const upgrade = devs.filter(d => d.status === 'upgrade').length;
+    const needsUpgrade = d => d.status === 'upgrade' || (d.status === 'stale' && (d.upgradeReasons || []).length > 0);
+    const needsAction = d => needsUpgrade(d) || d.status === 'missing';
+    const statusUpgrade = devs.filter(d => d.status === 'upgrade').length;
+    const upgrade = devs.filter(needsUpgrade).length;
     const ok = devs.filter(d => d.status === 'ok').length;
     const aged = devs.filter(d => d.ageYears != null);
     const avgAge = aged.length ? (aged.reduce((a, d) => a + d.ageYears, 0) / aged.length) : 0;
     const old5 = devs.filter(d => d.ageYears != null && d.ageYears > THRESH.maxAgeYears).length;
     const depts = {};
-    devs.forEach(d => { (depts[d.dept] = depts[d.dept] || { dept: d.dept, count: 0, upgrade: 0 }); depts[d.dept].count++; if (d.status === 'upgrade' || d.status === 'missing') depts[d.dept].upgrade++; });
+    devs.forEach(d => { (depts[d.dept] = depts[d.dept] || { dept: d.dept, count: 0, upgrade: 0 }); depts[d.dept].count++; if (needsAction(d)) depts[d.dept].upgrade++; });
     const ageBuckets = [
       { label: '< 2 Jahre', count: aged.filter(d => d.ageYears < 2).length },
       { label: '2–4 Jahre', count: aged.filter(d => d.ageYears >= 2 && d.ageYears < 4).length },
@@ -106,8 +130,25 @@
       deptCount: Object.keys(depts).length,
       byDept: Object.values(depts).sort((a, b) => b.count - a.count),
       ageBuckets, ramBuckets,
-      status: { ok, upgrade, stale, missing }
+      status: { ok, upgrade: statusUpgrade, stale, missing }
     };
+  }
+
+  function applyAssignment(d, args) {
+    if (!args) return d;
+    d.user = args.userDisplay || args.user;
+    d.userDisplay = args.userDisplay || args.user;
+    d.userSam = args.user || '';
+    d.userSource = 'manuell bestätigt';
+    d.dept = args.userDept || d.dept;
+    d.note = args.note || '';
+    d.confirmedBy = 'KOWOBAU\\T.Administrator';
+    d.initials = (d.userDisplay.split(' ').map(s => s[0]).join('').slice(0, 2)).toUpperCase();
+    return d;
+  }
+
+  function rebuildDevices() {
+    return PCS.map(compute).map(d => applyAssignment(d, ASSIGN[d.host]));
   }
 
   const AD_USERS = PCS.map(p => ({ sam: (p.f + '.' + p.l).toLowerCase(), display: p.f + ' ' + p.l, dept: p.d, mail: (p.f + '.' + p.l).toLowerCase() + '@kowobau.de' }))
@@ -117,8 +158,8 @@
       { sam: 's.weber', display: 'Sophie Weber', dept: 'Personal', mail: 's.weber@kowobau.de' }
     ]);
 
-  let DEVICES = PCS.map(compute);
   const ASSIGN = {};
+  let DEVICES = rebuildDevices();
   // Spiegelt die Config-Form des Rust-Backends (commands.rs get_settings/set_settings).
   const SETTINGS = {
     dataDir: 'C:\\(Vorschau)\\Inventory\\incoming',
@@ -142,15 +183,8 @@
         case 'set_assignment': {
           const d = DEVICES.find(x => x.host === args.host);
           if (!d) throw new Error('Geraet ist nicht in Inventar oder Masterliste vorhanden');
-          d.user = args.userDisplay || args.user;
-          d.userDisplay = args.userDisplay || args.user;
-          d.userSam = args.user || '';
-          d.userSource = 'manuell bestätigt';
-          d.dept = args.userDept || d.dept;
-          d.note = args.note || '';
-          d.confirmedBy = 'KOWOBAU\\T.Administrator';
-          d.initials = (d.userDisplay.split(' ').map(s => s[0]).join('').slice(0, 2)).toUpperCase();
-          ASSIGN[args.host] = args;
+          ASSIGN[args.host] = Object.assign({}, args);
+          applyAssignment(d, ASSIGN[args.host]);
           return { ok: true };
         }
         case 'get_settings': return JSON.parse(JSON.stringify(SETTINGS));
@@ -158,12 +192,16 @@
           const c = (args && args.config) || {};
           if (c.dataDir != null) SETTINGS.dataDir = c.dataDir;
           if (c.masterCsvPath != null) SETTINGS.masterCsvPath = c.masterCsvPath;
-          SETTINGS.assignmentsPath = c.assignmentsPath || SETTINGS.assignmentsPath;
+          if (c.assignmentsPath !== undefined) SETTINGS.assignmentsPath = c.assignmentsPath;
           SETTINGS.adEnabled = !!c.adEnabled;
-          if (c.thresholds) SETTINGS.thresholds = Object.assign({}, SETTINGS.thresholds, c.thresholds);
+          if (c.thresholds) {
+            THRESH = normalizeThresholds(c.thresholds, SETTINGS.thresholds);
+            SETTINGS.thresholds = Object.assign({}, THRESH);
+            DEVICES = rebuildDevices();
+          }
           return { ok: true };
         }
-        case 'refresh': DEVICES = PCS.map(compute); return { ok: true, count: DEVICES.length };
+        case 'refresh': THRESH = normalizeThresholds(SETTINGS.thresholds, THRESH); DEVICES = rebuildDevices(); return { ok: true, count: DEVICES.length };
         case 'export_devices': return { ok: true, path: '(Vorschau) export.csv', rows: DEVICES.length };
         case 'me': return { name: 'T. Administrator', initials: 'TA', domain: 'kowobau.local' };
         default: throw new Error('Unbekannter Mock-Befehl: ' + cmd);

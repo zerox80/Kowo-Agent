@@ -145,10 +145,13 @@ pub fn set_assignment(
     user_dept: Option<String>,
     note: String,
 ) -> Result<serde_json::Value, String> {
-    let mut inner = state.inner.lock().map_err(|e| e.to_string())?;
+    let config = {
+        let inner = state.inner.lock().map_err(|e| e.to_string())?;
+        inner.config.clone()
+    };
     let by = current_user_domain().0;
     store::write_assignment(
-        &inner.config,
+        &config,
         &host,
         &user,
         &user_display,
@@ -156,6 +159,7 @@ pub fn set_assignment(
         &note,
         &by,
     )?;
+    let mut inner = state.inner.lock().map_err(|e| e.to_string())?;
     inner.devices = None; // Cache invalidieren -> beim naechsten Lesen neu mergen
     Ok(serde_json::json!({ "ok": true }))
 }
@@ -178,8 +182,8 @@ pub fn get_settings(state: State<AppState>) -> Result<Config, String> {
 
 #[tauri::command]
 pub fn set_settings(state: State<AppState>, config: Config) -> Result<serde_json::Value, String> {
-    let mut inner = state.inner.lock().map_err(|e| e.to_string())?;
     store::save_config(&config)?;
+    let mut inner = state.inner.lock().map_err(|e| e.to_string())?;
     inner.config = config;
     inner.devices = None;
     inner.ad = None;

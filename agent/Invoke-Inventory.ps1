@@ -283,21 +283,25 @@ $json = $inventory | ConvertTo-Json -Depth 6
 # ----------------------------------------------------------------------------- write (atomic)
 function Write-AtomicJson {
     param([string]$Dir, [string]$Name, [string]$Content)
+    if ($Name -notmatch '^[A-Za-z0-9-]+\.json$') {
+        throw "Ungueltiger Inventar-Dateiname: $Name"
+    }
     if (-not (Test-Path -LiteralPath $Dir)) { New-Item -ItemType Directory -Path $Dir -Force | Out-Null }
     $final = Join-Path $Dir $Name
-    $tmp   = Join-Path $Dir ('{0}.{1}.tmp' -f $Name, ([guid]::NewGuid().ToString('N').Substring(0,8)))
+    $tmp   = Join-Path $Dir ('{0}.{1}.tmp' -f $Name, ([guid]::NewGuid().ToString('N')))
+    $backup = Join-Path $Dir ('{0}.{1}.bak' -f $Name, ([guid]::NewGuid().ToString('N')))
     # UTF-8 ohne BOM (gut fuer Rust/serde_json)
     [System.IO.File]::WriteAllText($tmp, $Content, (New-Object System.Text.UTF8Encoding($false)))
     try {
-        Move-Item -LiteralPath $tmp -Destination $final -Force -ErrorAction Stop
-    } catch {
-        # Restriktive Shares erlauben manchmal Schreiben, aber kein Replace/Delete.
-        # Dann wird die bekannte Zieldatei direkt ueberschrieben.
-        try {
-            [System.IO.File]::WriteAllText($final, $Content, (New-Object System.Text.UTF8Encoding($false)))
-        } finally {
-            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $final) {
+            [System.IO.File]::Replace($tmp, $final, $backup, $true)
+            Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
+        } else {
+            Move-Item -LiteralPath $tmp -Destination $final -ErrorAction Stop
         }
+    } catch {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        throw ("Atomarer Replace nach '{0}' fehlgeschlagen: {1}" -f $final, $_.Exception.Message)
     }
     return $final
 }

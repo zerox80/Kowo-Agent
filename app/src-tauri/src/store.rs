@@ -4,6 +4,7 @@ use crate::model::*;
 use crate::upgrade::{evaluate, fmt_de, DeviceFacts};
 use chrono::{DateTime, SecondsFormat, Utc};
 use std::collections::{BTreeSet, HashMap};
+use std::ffi::{OsStr, OsString};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
@@ -22,8 +23,11 @@ pub fn config_path() -> PathBuf {
 }
 
 fn app_config_dir() -> PathBuf {
-    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
-    Path::new(&base).join("HardView")
+    let base = std::env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_else(|| PathBuf::from("."));
+    base.join("HardView")
 }
 
 pub fn default_config() -> Config {
@@ -92,6 +96,9 @@ pub fn validate_config(cfg: &Config) -> Result<(), String> {
     if bad(&cfg.master_csv_path) {
         return Err("Ungültiger masterCsvPath".into());
     }
+    let data_path = hardened_config_path(Path::new(&cfg.data_dir), "dataDir")?;
+    let _master_csv_path = hardened_config_path(Path::new(&cfg.master_csv_path), "masterCsvPath")?;
+    validate_thresholds(&cfg.thresholds)?;
     if let Some(p) = &cfg.assignments_path {
         if bad(p) {
             return Err("Ungültiger assignmentsPath".into());
@@ -99,10 +106,9 @@ pub fn validate_config(cfg: &Config) -> Result<(), String> {
         if !p.to_lowercase().ends_with(".json") {
             return Err("assignmentsPath muss auf .json enden".into());
         }
-        let assignment_path = normalize_path(Path::new(p));
-        let data_path = normalize_path(Path::new(&cfg.data_dir));
-        let app_dir = normalize_path(&app_config_dir());
-        let control_dir = normalize_path(&control_dir_for(&cfg.data_dir));
+        let assignment_path = hardened_config_path(Path::new(p), "assignmentsPath")?;
+        let app_dir = hardened_config_path(&app_config_dir(), "AppData")?;
+        let control_dir = hardened_config_path(&control_dir_for(&cfg.data_dir), "Control-Ordner")?;
 
         if path_starts_with(&assignment_path, &data_path) {
             return Err(
@@ -114,6 +120,107 @@ pub fn validate_config(cfg: &Config) -> Result<(), String> {
         if !allowed {
             return Err("assignmentsPath muss im Control-Ordner oder AppData liegen".into());
         }
+    }
+    Ok(())
+}
+
+fn hardened_config_path(path: &Path, label: &str) -> Result<PathBuf, String> {
+    if !path.is_absolute() {
+        return Err(format!("{} muss ein absoluter Pfad sein", label));
+    }
+    if path
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err(format!("{} darf keine '..'-Segmente enthalten", label));
+    }
+    if path.components().any(|component| match component {
+        Component::Normal(value) => suspicious_path_component(value),
+        _ => false,
+    }) {
+        return Err(format!("{} enthaelt ein unsicheres Pfadsegment", label));
+    }
+    reject_reparse_components(path, label)?;
+    Ok(canonicalize_existing_prefix(path).unwrap_or_else(|| normalize_path(path)))
+}
+
+fn suspicious_path_component(component: &OsStr) -> bool {
+    let value = component.to_string_lossy();
+    value.is_empty()
+        || value == "."
+        || value == ".."
+        || value.ends_with([' ', '.'])
+        || value
+            .chars()
+            .any(|ch| matches!(ch, ':' | '"' | '<' | '>' | '|' | '?' | '*'))
+}
+
+fn reject_reparse_components(path: &Path, label: &str) -> Result<(), String> {
+    let mut current = PathBuf::new();
+    for component in path.components() {
+        current.push(component.as_os_str());
+        if !matches!(component, Component::Normal(_)) {
+            continue;
+        }
+        if let Ok(metadata) = fs::symlink_metadata(&current) {
+            if is_reparse_or_symlink(&metadata) {
+                return Err(format!(
+                    "{} darf keine Symlinks oder Reparse Points enthalten: {}",
+                    label,
+                    current.display()
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn canonicalize_existing_prefix(path: &Path) -> Option<PathBuf> {
+    let mut missing: Vec<OsString> = Vec::new();
+    let mut cursor = path;
+    loop {
+        if cursor.exists() {
+            let mut out = fs::canonicalize(cursor).ok()?;
+            for component in missing.iter().rev() {
+                out.push(component);
+            }
+            return Some(out);
+        }
+        missing.push(cursor.file_name()?.to_os_string());
+        cursor = cursor.parent()?;
+    }
+}
+
+#[cfg(windows)]
+fn is_reparse_or_symlink(metadata: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+    metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+#[cfg(not(windows))]
+fn is_reparse_or_symlink(metadata: &fs::Metadata) -> bool {
+    metadata.file_type().is_symlink()
+}
+
+fn validate_thresholds(th: &Thresholds) -> Result<(), String> {
+    if th.min_ram_gb < 0 {
+        return Err("minRamGB darf nicht negativ sein".into());
+    }
+    if !th.max_age_years.is_finite() || th.max_age_years <= 0.0 {
+        return Err("maxAgeYears muss groesser als 0 sein".into());
+    }
+    if th.stale_days <= 0 {
+        return Err("staleDays muss groesser als 0 sein".into());
+    }
+    if th.min_cpu_cores < 0 {
+        return Err("minCpuCores darf nicht negativ sein".into());
+    }
+    if th.min_cpu_clock_mhz < 0 {
+        return Err("minCpuClockMhz darf nicht negativ sein".into());
+    }
+    if th.target_ram_gb <= 0 {
+        return Err("targetRamGB muss groesser als 0 sein".into());
     }
     Ok(())
 }
@@ -687,12 +794,17 @@ pub fn build_overview(devs: &[DeviceFull], th: &Thresholds) -> Overview {
     let total = devs.len() as i64;
     let with_inv = devs.iter().filter(|d| d.has_inventory).count() as i64;
     let count = |s: &str| devs.iter().filter(|d| d.status == s).count() as i64;
-    let (ok, upgrade, stale, missing) = (
+    let needs_upgrade = |d: &DeviceFull| {
+        d.status == "upgrade" || (d.status == "stale" && !d.upgrade_reasons.is_empty())
+    };
+    let needs_action = |d: &DeviceFull| needs_upgrade(d) || d.status == "missing";
+    let (ok, status_upgrade, stale, missing) = (
         count("ok"),
         count("upgrade"),
         count("stale"),
         count("missing"),
     );
+    let upgrade = devs.iter().filter(|d| needs_upgrade(d)).count() as i64;
     let aged: Vec<f64> = devs.iter().filter_map(|d| d.age_years).collect();
     let avg = if aged.is_empty() {
         0.0
@@ -708,7 +820,7 @@ pub fn build_overview(devs: &[DeviceFull], th: &Thresholds) -> Overview {
     for d in devs {
         let e = dept_map.entry(d.dept.clone()).or_insert((0, 0));
         e.0 += 1;
-        if d.status == "upgrade" || d.status == "missing" {
+        if needs_action(d) {
             e.1 += 1;
         }
     }
@@ -782,7 +894,7 @@ pub fn build_overview(devs: &[DeviceFull], th: &Thresholds) -> Overview {
         ram_buckets,
         status: StatusCounts {
             ok,
-            upgrade,
+            upgrade: status_upgrade,
             stale,
             missing,
         },
@@ -893,21 +1005,26 @@ fn days_since(iso: &str) -> Option<i64> {
 // ------------------------------------------------------------------ Atomic write
 fn atomic_write(path: &Path, content: &str) -> Result<(), String> {
     let pid = std::process::id();
-    let nanos = std::time::SystemTime::now()
+    let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.subsec_nanos())
+        .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let tmp = path.with_extension(format!("tmp-{}-{}", pid, nanos));
-    fs::write(&tmp, content).map_err(|e| format!("Schreiben fehlgeschlagen: {}", e))?;
-    if let Err(replace_err) = replace_file(&tmp, path) {
-        if let Err(write_err) = fs::write(path, content) {
+    let tmp = path.with_extension(format!("tmp-{}-{}", pid, stamp));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp)
+        .map_err(|e| format!("Temporäre Datei konnte nicht angelegt werden: {}", e))?;
+    file.write_all(content.as_bytes())
+        .and_then(|_| file.sync_all())
+        .map_err(|e| {
             let _ = fs::remove_file(&tmp);
-            return Err(format!(
-                "Umbenennen fehlgeschlagen: {}; direktes Schreiben fehlgeschlagen: {}",
-                replace_err, write_err
-            ));
-        }
+            format!("Schreiben fehlgeschlagen: {}", e)
+        })?;
+    drop(file);
+    if let Err(replace_err) = replace_file(&tmp, path) {
         let _ = fs::remove_file(&tmp);
+        return Err(format!("Atomarer Replace fehlgeschlagen: {}", replace_err));
     }
     Ok(())
 }
@@ -1008,12 +1125,27 @@ fn assignment_lock_is_stale(path: &Path) -> bool {
 mod tests {
     use super::*;
 
+    fn sample_data_dir() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../shared/sample-data")
+            .canonicalize()
+            .unwrap()
+    }
+
     fn sample_config() -> Config {
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/sample-data");
+        let base = sample_data_dir();
         Config {
-            data_dir: format!("{}/Inventory", base),
-            master_csv_path: format!("{}/Rollout_Masterliste.csv", base),
-            assignments_path: Some(format!("{}/control/assignments.json", base)),
+            data_dir: base.join("Inventory").to_string_lossy().to_string(),
+            master_csv_path: base
+                .join("Rollout_Masterliste.csv")
+                .to_string_lossy()
+                .to_string(),
+            assignments_path: Some(
+                base.join("control")
+                    .join("assignments.json")
+                    .to_string_lossy()
+                    .to_string(),
+            ),
             ad_enabled: false,
             thresholds: Thresholds::default(),
         }
@@ -1087,6 +1219,11 @@ mod tests {
         assert!(empfang.upgrade_reasons.iter().any(|r| r.contains("HDD")));
         assert!(empfang.upgrade_reasons.iter().any(|r| r.contains("alt")));
 
+        let lager = devs.iter().find(|d| d.host == "WS-LAGER-01").unwrap();
+        assert_eq!(lager.status, "stale");
+        assert!(lager.upgrade_reasons.iter().any(|r| r.contains("HDD")));
+        assert!(lager.upgrade_reasons.iter().any(|r| r.contains("Win 10")));
+
         // Host ohne JSON -> missing + "nie"
         let buch08 = devs.iter().find(|d| d.host == "WS-BUCH-08").unwrap();
         assert!(!buch08.has_inventory);
@@ -1100,7 +1237,16 @@ mod tests {
         let ov = build_overview(&devs, &cfg.thresholds);
         assert_eq!(ov.total, 18);
         assert_eq!(ov.dept_count, 9);
-        assert_eq!(ov.upgrade_needed, 4);
+        assert_eq!(ov.status.upgrade, 4);
+        assert_eq!(ov.upgrade_needed, 5);
+        assert_eq!(
+            ov.by_dept
+                .iter()
+                .find(|d| d.dept == "Lager")
+                .unwrap()
+                .upgrade,
+            2
+        );
         assert_eq!(ov.current, ov.with_inventory - ov.stale);
         assert!(ov.avg_age_years > 0.0);
 
@@ -1152,7 +1298,7 @@ mod tests {
     #[test]
     fn config_path_validation() {
         let mut cfg = sample_config();
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/sample-data");
+        let base = sample_data_dir();
         assert!(validate_config(&cfg).is_ok());
 
         // Ungueltige Pfade blockieren (z. B. System32-Ausbruch)
@@ -1160,19 +1306,97 @@ mod tests {
         assert!(validate_config(&cfg).is_err());
 
         // Client-writable Inventory-Inbox ist kein gueltiger Schreibort.
-        cfg.assignments_path = Some(format!("{}/Inventory/assignments.json", base));
+        cfg.assignments_path = Some(
+            base.join("Inventory")
+                .join("assignments.json")
+                .to_string_lossy()
+                .to_string(),
+        );
+        assert!(validate_config(&cfg).is_err());
+
+        // Syntaktische Ausbrueche, relative Pfade und ADS-aehnliche Namen blockieren.
+        let control_path = base.join("control").to_string_lossy().to_string();
+        cfg.assignments_path = Some(format!(
+            "{}{}..{}control{}assignments.json",
+            control_path,
+            std::path::MAIN_SEPARATOR,
+            std::path::MAIN_SEPARATOR,
+            std::path::MAIN_SEPARATOR
+        ));
+        assert!(validate_config(&cfg).is_err());
+
+        cfg.assignments_path = Some("control/assignments.json".to_string());
+        assert!(validate_config(&cfg).is_err());
+
+        cfg.assignments_path = Some(
+            base.join("control")
+                .join("evil:assignments.json")
+                .to_string_lossy()
+                .to_string(),
+        );
         assert!(validate_config(&cfg).is_err());
 
         // Gueltige Pfade erlauben (Control-Pfad oder AppData)
-        cfg.assignments_path = Some(format!("{}/control/assignments.json", base));
+        cfg.assignments_path = Some(
+            base.join("control")
+                .join("assignments.json")
+                .to_string_lossy()
+                .to_string(),
+        );
         assert!(validate_config(&cfg).is_ok());
 
-        let appdata = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
-        let valid_path = Path::new(&appdata)
-            .join("HardView")
-            .join("assignments.json");
+        let valid_path = app_config_dir().join("assignments.json");
         cfg.assignments_path = Some(valid_path.to_string_lossy().to_string());
         assert!(validate_config(&cfg).is_ok());
+    }
+
+    #[test]
+    fn atomic_write_fails_closed_when_replace_fails() {
+        let root = unique_temp_dir("atomic-replace");
+        fs::create_dir_all(&root).unwrap();
+        let target = root.join("target.json");
+        fs::create_dir_all(&target).unwrap();
+
+        let err = atomic_write(&target, "{}").unwrap_err();
+        assert!(err.contains("Atomarer Replace"));
+        assert!(
+            target.is_dir(),
+            "existing target directory must remain intact"
+        );
+        let leftovers: Vec<_> = fs::read_dir(&root)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("target.tmp-")
+            })
+            .collect();
+        assert!(leftovers.is_empty(), "temporary file should be removed");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn config_threshold_validation() {
+        let mut cfg = sample_config();
+        assert!(validate_config(&cfg).is_ok());
+
+        cfg.thresholds.target_ram_gb = 0;
+        assert!(validate_config(&cfg).is_err());
+
+        cfg = sample_config();
+        cfg.thresholds.stale_days = 0;
+        assert!(validate_config(&cfg).is_err());
+
+        cfg = sample_config();
+        cfg.thresholds.max_age_years = f64::NAN;
+        assert!(validate_config(&cfg).is_err());
+
+        cfg = sample_config();
+        cfg.thresholds.min_cpu_clock_mhz = -1;
+        assert!(validate_config(&cfg).is_err());
     }
 
     #[test]

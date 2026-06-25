@@ -37,6 +37,26 @@ jobs:
       - name: Tests
         run: cargo test --all
 
+      - name: PowerShell-Syntax pruefen
+        shell: pwsh
+        run: |
+          $files = @(
+            '../../agent/Invoke-Inventory.ps1',
+            '../../agent/deploy/Install-InventoryTask.ps1',
+            '../../agent/deploy/Remove-StaleInventory.ps1',
+            '../../shared/sample-data/New-SampleData.ps1'
+          )
+          foreach ($file in $files) {
+            $resolved = Resolve-Path $file
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($resolved, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors) {
+              $errors | Format-List | Out-String | Write-Error
+              throw "PowerShell parse errors in $resolved"
+            }
+          }
+
   frontend:
     name: Frontend-Syntax
     runs-on: ubuntu-latest
@@ -47,8 +67,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: JS-Syntax pruefen (node --check)
-        run: |
-          node --check app/src/app.js
-          node --check app/src/mock.js
-          node --check app/dev-server.js
+      - name: JS-Syntax pruefen
+        working-directory: app
+        run: npm run check

@@ -15,13 +15,15 @@ Lege einen Ablageordner an, z. B. eine versteckte Freigabe `Inventory$` auf dem 
 | Prinzipal | Recht | Zweck |
 |---|---|---|
 | `Domänen-Computer` | Nur auf `incoming\`: *Ordner auflisten/lesen* **deaktivieren**, *Dateien erstellen / Daten schreiben* + *Schreiben* erlauben (nur „Nur dieser Ordner") | Jeder PC kann eine neue JSON anlegen, aber keine fremden Dateien lesen/auflisten |
-| `ERSTELLER-BESITZER` / `CREATOR OWNER` | Nur auf `incoming\`: *Ändern* inkl. Löschen (nur „Unterordner und Dateien") | Der jeweilige PC kann seine eigene JSON bei späteren Läufen ersetzen |
+| `ERSTELLER-BESITZER` / `CREATOR OWNER` | Nur auf `incoming\`: *Ändern* inkl. Löschen/Replace (nur „Unterordner und Dateien") | Der jeweilige PC kann seine eigene JSON bei späteren Läufen atomar ersetzen |
 | IT-Gruppe (z. B. `GG-IT-Admins`) | Lesen auf `incoming\`, Ändern / Vollzugriff auf `control\` | App liest Inventar und schreibt `control\assignments.json` |
 
 > **Warum „Domänen-Computer"?** Der Task läuft als **SYSTEM**; beim Netzwerkzugriff
 > authentifiziert sich der PC als Computerkonto `DOMÄNE\PC$`. Diese gehören zu „Domänen-Computer".
 > Den Agent-Test mindestens zweimal auf demselben PC ausführen: Der zweite Lauf prüft, ob das
-> Überschreiben von `<hostname>.json` mit den gesetzten ACLs wirklich erlaubt ist.
+> atomare Ersetzen von `<hostname>.json` mit den gesetzten ACLs wirklich erlaubt ist. Der Agent
+> schreibt nicht direkt über eine vorhandene Datei hinweg; fehlende Replace-/Delete-Rechte sind
+> deshalb ein bewusst sichtbarer Fehler.
 
 ## 2. Wichtiger Hinweis: SYSTEM kennt kein `G:\`
 
@@ -30,7 +32,7 @@ Der Agent muss per GPO daher mit einem **UNC-Pfad** als Ziel laufen:
 
 ```
 -OutputDir "\\FILESERVER\Inventory$\incoming"     ✔  (UNC)
--OutputDir "G:\Inventory"                �’  (funktioniert NUR interaktiv, nicht als SYSTEM)
+-OutputDir "G:\Inventory"                X  (funktioniert NUR interaktiv, nicht als SYSTEM)
 ```
 
 ## 3. Agent-Skript bereitstellen
@@ -82,7 +84,7 @@ Get-Content "$env:ProgramData\Kowobau\HardwareInventar\agent.log" -Tail 20
 ```
 Kein Fenster, kein Toast — der Lauf ist für den Mitarbeiter unsichtbar (stört die Arbeit nicht).
 
-## 6. Empfohlen: Skript signieren (+ `AllSigned`)
+## 6. Erzwungen: Skript signieren (+ `AllSigned`)
 
 Da der Agent als **SYSTEM** aus einer Netzwerkfreigabe läuft, sollte seine Integrität erzwungen
 werden, statt sich allein auf die Ordner-ACL zu verlassen. Skript mit einem internen
@@ -90,9 +92,13 @@ Code-Signing-Zertifikat signieren:
 ```powershell
 Set-AuthenticodeSignature .\Invoke-Inventory.ps1 -Certificate (Get-ChildItem Cert:\CurrentUser\My -CodeSigning)[0]
 ```
-Die mitgelieferte Task-XML und `Install-InventoryTask.ps1` verwenden `AllSigned` bereits als Default.
-Für lokale, unsignierte Tests kann temporär `-ExecutionPolicy RemoteSigned` gesetzt werden; produktiv sollte
-`AllSigned` bleiben. So führt ein manipuliertes oder untergeschobenes Skript **nicht** mehr aus.
+Die mitgelieferte Task-XML verwendet `AllSigned`. `Install-InventoryTask.ps1` prüft bei `AllSigned`
+vor der Registrierung eine gültige Authenticode-Signatur und bricht bei einem unsignierten oder
+manipulierten Agent-Skript ab. Für lokale, unsignierte Labortests ist der Testmodus explizit:
+```powershell
+.\Install-InventoryTask.ps1 -ExecutionPolicy RemoteSigned -AllowUnsignedForTest -OutputDir "$env:TEMP\inv"
+```
+Produktiv bleibt `AllSigned`; so führt ein manipuliertes oder untergeschobenes Skript **nicht** mehr aus.
 
 ## 7. Transparenz / Datenschutz
 
@@ -101,6 +107,10 @@ Hardware-/Bestandsdaten zur Lebenszyklusplanung. Bei Mitbestimmung empfiehlt sic
 Information an den Betriebsrat (Zweck: Hardware-Upgrade-Planung; keine Verhaltens-/Leistungskontrolle).
 
 Die JSONs enthalten gerätebezogene Daten mit Personenbezug (Seriennummer, MAC/IP, zuletzt
-angemeldeter Benutzer). **Aufbewahrung/Bereinigung** festlegen: veraltete `<hostname>.json`
-ausgemusterter Geräte regelmäßig vom Share entfernen, und den Zugriff per ACL (Abschnitt 1)
-auf die IT beschränken.
+angemeldeter Benutzer). Veraltete `<hostname>.json` ausgemusterter Geräte regelmäßig vom Share
+entfernen, und den Zugriff per ACL (Abschnitt 1) auf die IT beschränken. Das Cleanup-Skript
+löscht nur Agent-JSONs, deren `hostname` zum Dateinamen passt:
+```powershell
+.\Remove-StaleInventory.ps1 -InventoryDir "\\FILESERVER\Inventory$\incoming" -RetentionDays 180 -WhatIf
+.\Remove-StaleInventory.ps1 -InventoryDir "\\FILESERVER\Inventory$\incoming" -RetentionDays 180
+```

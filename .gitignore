@@ -5,12 +5,31 @@ app/src-tauri/gen/
 # Node
 node_modules/
 
+# Lokale Konfiguration / Tools
+.codex/
+.agents/
+.env
+.env.*
+!.env.example
+*.local
+
 # Dev-/Verifikations-Artefakte
 app/hardview-screenshot.png
+app/dist/
+app/build/
+coverage/
+*.log
 **/*.tmp
 **/*.tmp-*
+*.bak
+*.orig
+*.rej
 
 # OS
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# IDE
+.idea/
+.vscode/
