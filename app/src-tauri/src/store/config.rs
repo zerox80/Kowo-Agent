@@ -19,16 +19,19 @@ pub(super) fn app_config_dir() -> PathBuf {
 
 pub fn default_config() -> Config {
     let data_dir =
-        std::env::var("KOWO_DATA_DIR").unwrap_or_else(|_| "G:\\Inventory\\incoming".into());
-    let csv = std::env::var("KOWO_CSV")
+        std::env::var("HARDVIEW_DATA_DIR").unwrap_or_else(|_| "G:\\Inventory\\incoming".into());
+    let csv = std::env::var("HARDVIEW_CSV")
         .unwrap_or_else(|_| "G:\\Bitlocker\\Rollout_Masterliste.csv".into());
     Config {
         data_dir: data_dir.clone(),
         master_csv_path: csv,
         assignments_path: Some(
-            std::env::var("KOWO_ASSIGN").unwrap_or_else(|_| default_assignments_path(&data_dir)),
+            std::env::var("HARDVIEW_ASSIGN")
+                .unwrap_or_else(|_| default_assignments_path(&data_dir)),
         ),
-        ad_enabled: std::env::var("KOWO_AD").map(|v| v == "1").unwrap_or(false),
+        ad_enabled: std::env::var("HARDVIEW_AD")
+            .map(|v| v == "1")
+            .unwrap_or(false),
         thresholds: Thresholds::default(),
     }
 }
@@ -40,13 +43,13 @@ pub fn load_config() -> Config {
         default_config()
     };
     // Dev-/Override per Umgebungsvariablen (erleichtert Tests gegen sample-data)
-    if let Ok(v) = std::env::var("KOWO_DATA_DIR") {
+    if let Ok(v) = std::env::var("HARDVIEW_DATA_DIR") {
         cfg.data_dir = v;
     }
-    if let Ok(v) = std::env::var("KOWO_CSV") {
+    if let Ok(v) = std::env::var("HARDVIEW_CSV") {
         cfg.master_csv_path = v;
     }
-    if let Ok(v) = std::env::var("KOWO_ASSIGN") {
+    if let Ok(v) = std::env::var("HARDVIEW_ASSIGN") {
         cfg.assignments_path = Some(v);
     }
     if cfg.assignments_path.is_none() {

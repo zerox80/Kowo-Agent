@@ -1,4 +1,4 @@
-# Kowo-Agent · HardView
+# HardView
 
 Windows-Hardware-Inventarisierung und Asset-Zuordnung — dateibasiert, kein Server erforderlich.
 
@@ -64,9 +64,9 @@ node app/dev-server.js
 **App mit Demo-Daten starten:**
 ```powershell
 cd app
-$env:KOWO_DATA_DIR='..\shared\sample-data\Inventory'
-$env:KOWO_CSV='..\shared\sample-data\Rollout_Masterliste.csv'
-$env:KOWO_ASSIGN='..\shared\sample-data\control\assignments.json'
+$env:HARDVIEW_DATA_DIR='..\shared\sample-data\Inventory'
+$env:HARDVIEW_CSV='..\shared\sample-data\Rollout_Masterliste.csv'
+$env:HARDVIEW_ASSIGN='..\shared\sample-data\control\assignments.json'
 npm ci
 npm run dev
 ```
@@ -101,10 +101,10 @@ Reihenfolge: `%APPDATA%\HardView\config.json` → Defaults → Umgebungsvariable
 
 | Variable | Beschreibung |
 |---|---|
-| `KOWO_DATA_DIR` | Pfad zum `incoming\`-Ordner mit Agent-JSONs |
-| `KOWO_CSV` | Pfad zur Rollout-Masterliste (CSV) |
-| `KOWO_ASSIGN` | Pfad zur `assignments.json` |
-| `KOWO_AD=1` | AD-Lookup aktivieren |
+| `HARDVIEW_DATA_DIR` | Pfad zum `incoming\`-Ordner mit Agent-JSONs |
+| `HARDVIEW_CSV` | Pfad zur Rollout-Masterliste (CSV) |
+| `HARDVIEW_ASSIGN` | Pfad zur `assignments.json` |
+| `HARDVIEW_AD=1` | AD-Lookup aktivieren |
 
 Alle Einstellungen können auch direkt in der App unter **Einstellungen** gepflegt werden (schreibt dieselbe `config.json`; `assignmentsPath` wird serverseitig auf Control-Ordner/AppData beschränkt).
 

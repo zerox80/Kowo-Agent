@@ -1,8 +1,8 @@
 {
     "version":  1,
-    "dataDir":  "C:\\Daten\\Kowo-Agent\\shared\\sample-data\\Inventory",
-    "masterCsvPath":  "C:\\Daten\\Kowo-Agent\\shared\\sample-data\\Rollout_Masterliste.csv",
-    "assignmentsPath":  "C:\\Daten\\Kowo-Agent\\shared\\sample-data\\control\\assignments.json",
+    "dataDir":  "C:\\Daten\\HardView\\shared\\sample-data\\Inventory",
+    "masterCsvPath":  "C:\\Daten\\HardView\\shared\\sample-data\\Rollout_Masterliste.csv",
+    "assignmentsPath":  "C:\\Daten\\HardView\\shared\\sample-data\\control\\assignments.json",
     "adEnabled":  false,
     "thresholds":  {
                        "minRamGB":  8,
