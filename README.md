@@ -30,6 +30,7 @@ Rollout_Masterliste.csv (Geräte↔Benutzer) ───────────�
 ```
 agent/
   Invoke-Inventory.ps1            Inventar-Agent (WMI/CIM → JSON), PS 5.1
+  Invoke-InventoryDebug.ps1       temporaerer GPO/Scheduled-Task Debug-Wrapper
   deploy/                         GPO-Rollout: Installer, Task-XML, Deployment-Anleitung
 app/
   src/                            Frontend (Vanilla JS, keine externen Abhängigkeiten)

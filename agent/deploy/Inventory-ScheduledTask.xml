@@ -16,6 +16,13 @@
   EMPFOHLEN: Skript signieren. Der SYSTEM-Lauf aus einer Freigabe macht die
   Skript-Integritaet sicherheitsrelevant (Schreibrecht auf die Skriptquelle
   strikt auf Domaenen-Admins beschraenken).
+
+  DEBUG BEI 0x1:
+  Invoke-InventoryDebug.ps1 temporaer neben Invoke-Inventory.ps1 nach NETLOGON kopieren
+  und bei ExecutionPolicy AllSigned ebenfalls signieren.
+  In <Arguments> nur den -File Pfad auf den Debug-Wrapper umstellen:
+    -NoProfile -NonInteractive -ExecutionPolicy AllSigned -WindowStyle Hidden -File "\\YOUR_DOMAIN.local\NETLOGON\HardView\Invoke-InventoryDebug.ps1" -OutputDir "\\FILESERVER\Inventory$\incoming"
+  Das Client-Log liegt danach unter %ProgramData%\HardView\agent\task-debug.log.
 -->
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>

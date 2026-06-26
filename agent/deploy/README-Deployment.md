@@ -45,6 +45,9 @@ Lege `Invoke-Inventory.ps1` an einen Ort, den **Domänen-Computer lesen** könne
 
 (NETLOGON wird automatisch repliziert und ist für alle Computer/Use​r lesbar.)
 
+Für die Fehlersuche kann `Invoke-InventoryDebug.ps1` temporär in denselben NETLOGON-Ordner kopiert
+und per GPO statt des normalen Agent-Skripts gestartet werden.
+
 > **Sicherheit (wichtig):** Der Task läuft als **SYSTEM** und führt dieses Skript auf **jedem**
 > Client aus. Wer Schreibzugriff auf `…\NETLOGON\HardView\` hat, erlangt damit SYSTEM-Codeausführung
 > auf der gesamten Flotte. Schreibrecht auf diesen Ordner deshalb strikt auf **Domänen-Admins**
@@ -103,24 +106,47 @@ Get-WinEvent -FilterHashtable @{
 Get-Content "$env:ProgramData\HardView\agent\agent.log" -Tail 80
 ```
 
-Fuer einen lokalen Test-PC kann der Installer den Task temporaer mit Debug-Logging registrieren:
+Bei GPO/NETLOGON-Rollout: Kopiere `Invoke-InventoryDebug.ps1` temporaer neben den normalen Agent
+und stelle die GPO-Aktion temporaer auf den Debug-Wrapper um.
 
 ```powershell
-# Labortest mit unsigniertem Skript:
-.\Install-InventoryTask.ps1 -ExecutionPolicy RemoteSigned -AllowUnsignedForTest -OutputDir "$env:TEMP\inv" -DebugLog
+# Einmalig auf dem Share bereitstellen:
+Copy-Item .\Invoke-InventoryDebug.ps1 "\\YOUR_DOMAIN.local\NETLOGON\HardView\Invoke-InventoryDebug.ps1"
+```
 
-# Produktivnaher Test mit signiertem Skript und echtem Share:
-.\Install-InventoryTask.ps1 -ScriptPath "\\YOUR_DOMAIN.local\NETLOGON\HardView\Invoke-Inventory.ps1" -OutputDir "\\FILESERVER\Inventory$\incoming" -DebugLog
+Bei `ExecutionPolicy AllSigned` muss auch `Invoke-InventoryDebug.ps1` gueltig signiert sein,
+sonst blockt PowerShell den Wrapper vor dem ersten Log-Eintrag.
 
+GPO-Aktion:
+
+```text
+Programm/Skript:
+%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe
+
+Argumente:
+-NoProfile -NonInteractive -ExecutionPolicy AllSigned -WindowStyle Hidden -File "\\YOUR_DOMAIN.local\NETLOGON\HardView\Invoke-InventoryDebug.ps1" -OutputDir "\\FILESERVER\Inventory$\incoming"
+```
+
+Auf dem betroffenen Client:
+
+```powershell
+gpupdate /force
 Start-ScheduledTask -TaskName 'HardwareInventar' -TaskPath '\HardView\'
 Start-Sleep -Seconds 10
 Get-ScheduledTaskInfo -TaskName 'HardwareInventar' -TaskPath '\HardView\'
 Get-Content "$env:ProgramData\HardView\agent\task-debug.log" -Tail 160
 ```
 
+Fuer einen einzelnen lokalen Test-PC kann alternativ der Installer den Task temporaer mit Debug-Logging
+registrieren:
+
+```powershell
+.\Install-InventoryTask.ps1 -ExecutionPolicy RemoteSigned -AllowUnsignedForTest -OutputDir "$env:TEMP\inv" -DebugLog
+```
+
 Der Debug-Wrapper laeuft weiterhin als SYSTEM und protokolliert Identitaet, PowerShell-Version,
 Skriptpfad, Zielordner, Verbose-Ausgaben und die vollstaendige PowerShell-Exception. Nach der
-Fehlersuche den Task wieder ohne `-DebugLog` registrieren.
+Fehlersuche die GPO-Aktion wieder auf `Invoke-Inventory.ps1` zurueckstellen.
 
 ## 6. Erzwungen: Skript signieren (+ `AllSigned`)
 

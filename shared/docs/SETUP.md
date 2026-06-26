@@ -50,8 +50,8 @@ Verifizieren über `agent.log` und die erzeugte `<hostname>.json`.
 ## Troubleshooting
 
 > `LastTaskResult = 0x1`: TaskScheduler-Eventlog und `%ProgramData%\HardView\agent\agent.log`
-> pruefen; fuer echte stdout/stderr-Ausgaben `Install-InventoryTask.ps1 -DebugLog` nutzen
-> (siehe Deployment-Doku).
+> pruefen; bei GPO/NETLOGON den Task temporaer auf `Invoke-InventoryDebug.ps1` umstellen
+> und `%ProgramData%\HardView\agent\task-debug.log` lesen (siehe Deployment-Doku).
 
 | Symptom | Ursache / Lösung |
 |---|---|
