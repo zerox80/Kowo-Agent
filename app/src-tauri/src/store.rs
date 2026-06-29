@@ -4,15 +4,16 @@ mod assignments;
 mod atomic;
 mod common;
 mod config;
+mod facts;
 mod inventory;
 mod master_csv;
 mod merge;
 mod overview;
 mod text;
 
-pub use assignments::write_assignment;
+pub use assignments::{write_assignment_for_known_hosts, AssignmentWrite};
 pub use config::{load_config, save_config};
-pub use merge::build_devices;
+pub use merge::{apply_manual_assignment, build_devices};
 pub use overview::build_overview;
 
 #[cfg(test)]
