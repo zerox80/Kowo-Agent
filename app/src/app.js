@@ -44,6 +44,7 @@
   // ---------------- state ----------------
   const state = { view: 'inventar', devices: [], overview: null, settings: null, q: '', filter: 'all', sort: 'host', dir: 'asc', selected: null };
   const DEFAULT_THRESHOLDS = { minRamGB: 8, maxAgeYears: 5, staleDays: 30, requireSsd: true, minCpuCores: 4, minCpuClockMhz: 0, targetRamGB: 16 };
+  const ViewModel = window.HardViewViewModel;
 
   const VIEWS = {
     inventar:  { title: 'Geräte-Inventar', sub: 'Hardware-Bestand aller Arbeitsplätze · wöchentliche Inventarisierung', list: true, filter: 'all' },
@@ -80,35 +81,7 @@
   }
 
   function visible() {
-    const isUpgradeCandidate = (d) => d.status === 'upgrade' || (d.status === 'stale' && (d.upgradeReasons || []).length > 0);
-    let list = state.devices.filter((d) => {
-      if (state.filter !== 'all') {
-        if (state.filter === 'veraltet') { if (!(d.status === 'stale' || d.status === 'missing')) return false; }
-        else if (state.filter === 'upgrade') { if (!isUpgradeCandidate(d)) return false; }
-        else if (d.status !== state.filter) return false;
-      }
-      if (state.q) {
-        const hay = (d.host + ' ' + d.user + ' ' + d.cpu + ' ' + d.dept).toLowerCase();
-        if (hay.indexOf(state.q) === -1) return false;
-      }
-      return true;
-    });
-    const dir = state.dir === 'asc' ? 1 : -1;
-    const rank = { ok: 0, upgrade: 1, stale: 2, missing: 3 };
-    list.sort((a, b) => {
-      let av, bv;
-      switch (state.sort) {
-        case 'user': av = a.user.toLowerCase(); bv = b.user.toLowerCase(); break;
-        case 'cpu': av = a.cpu.toLowerCase(); bv = b.cpu.toLowerCase(); break;
-        case 'ram': av = a.ramGB; bv = b.ramGB; break;
-        case 'age': av = a.ageYears == null ? -1 : a.ageYears; bv = b.ageYears == null ? -1 : b.ageYears; break;
-        case 'status': av = rank[a.status]; bv = rank[b.status]; break;
-        default: av = a.host.toLowerCase(); bv = b.host.toLowerCase();
-      }
-      if (av < bv) return -1 * dir; if (av > bv) return 1 * dir;
-      return a.host < b.host ? -1 : 1;
-    });
-    return list;
+    return ViewModel.visibleDevices(state.devices, state);
   }
 
   // ---------------- render: KPIs ----------------
@@ -128,7 +101,7 @@
   }
 
   // ---------------- render: segments ----------------
-  function renderSegs() {
+  function renderSegs(visibleCount) {
     const o = state.overview; if (!o) return;
     const host = $('#segs'); host.innerHTML = '';
     const defs = [
@@ -138,11 +111,11 @@
       ['veraltet', 'Veraltet', o.status.stale + o.status.missing]
     ];
     defs.forEach(([key, label, count]) => {
-      const seg = el('div', { class: 'seg' + (state.filter === key ? ' active' : ''), onclick: () => { state.filter = key; window.HardView.renderAll(); } },
+      const seg = el('div', { class: 'seg' + (state.filter === key ? ' active' : ''), onclick: () => { state.filter = key; renderList(); } },
         label, el('span', { class: 'cnt' }, count));
       host.appendChild(seg);
     });
-    const vis = visible().length;
+    const vis = visibleCount == null ? visible().length : visibleCount;
     $('#resultCount').textContent = vis + ' von ' + o.total;
   }
 
@@ -166,16 +139,16 @@
       }, h.label + arrow));
     });
   }
-  function renderRows() {
+  function renderRows(list) {
     const host = $('#tbody'); host.innerHTML = '';
-    const list = visible();
-    if (!list.length) { host.appendChild(el('div', { class: 'empty' }, 'Keine Geräte für diese Filterung.')); return; }
-    list.forEach((d) => {
+    const rows = list || visible();
+    if (!rows.length) { host.appendChild(el('div', { class: 'empty' }, 'Keine Geräte für diese Filterung.')); return; }
+    rows.forEach((d) => {
       const ramTarget = Math.max(1, Number(d.ramTargetGB) || DEFAULT_THRESHOLDS.targetRamGB);
       const ramPct = Math.min(100, Math.max(0, Math.round((d.ramGB / ramTarget) * 100)));
       const row = el('div', {
         class: 'row grid-cols' + (d.status === 'upgrade' ? ' warn' : '') + (state.selected === d.host ? ' sel' : '') + (d.status === 'stale' || d.status === 'missing' ? ' dim' : ''),
-        onclick: () => { state.selected = d.host; renderRows(); renderDrawer(); }
+        onclick: () => { state.selected = d.host; renderRows(rows); renderDrawer(); }
       },
         el('div', { style: { display: 'flex', justifyContent: 'center' } }, el('div', { class: 'dot ' + d.status })),
         el('div', { class: 'cell-min' },
@@ -200,6 +173,13 @@
       );
       host.appendChild(row);
     });
+  }
+
+  function renderList() {
+    const list = visible();
+    renderSegs(list.length);
+    renderThead();
+    renderRows(list);
   }
 
   // ---------------- render: detail drawer ----------------
@@ -276,11 +256,13 @@
     loadData,
     renderDrawer,
     renderKpis,
+    renderList,
     renderRows,
     renderSegs,
     renderThead,
     state,
     svg,
-    toast
+    toast,
+    ViewModel
   };
 })();

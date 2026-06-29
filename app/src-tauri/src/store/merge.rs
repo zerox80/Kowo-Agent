@@ -90,7 +90,14 @@ fn build_one(
     // ----- OS / Alter / Last-Seen -----
     let os = iv.os.clone().unwrap_or_default();
     let os_caption = opt_str(&os.caption, "—");
-    let os_build = os.version.clone().or(os.build.clone()).unwrap_or_default();
+    let os_build = os
+        .version
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .or_else(|| os.build.as_deref().map(str::trim).filter(|s| !s.is_empty()))
+        .unwrap_or_default()
+        .to_string();
     let os_is_win11 = classify_windows_11(&os_caption, &os_build);
     let age_years = iv.age_years;
     let last_seen_days = iv.collected_at_utc.as_deref().and_then(days_since);

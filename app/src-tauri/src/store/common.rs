@@ -43,14 +43,21 @@ pub(super) fn avatar_color(host: &str) -> String {
     PALETTE[(n as usize) % PALETTE.len()].to_string()
 }
 pub(super) fn os_short(caption: &str, build: &str) -> String {
+    let b = build.rsplit('.').next().unwrap_or(build);
+    let inferred_windows = match b {
+        "22631" | "22621" | "26100" | "26200" => Some("Win 11"),
+        "19045" | "19044" => Some("Win 10"),
+        _ => None,
+    };
     let w = if caption.contains("11") {
         "Win 11"
     } else if caption.contains("10") {
         "Win 10"
+    } else if let Some(name) = inferred_windows {
+        name
     } else {
         caption
     };
-    let b = build.rsplit('.').next().unwrap_or(build);
     let label = match b {
         "22631" => "23H2",
         "22621" => "22H2",

@@ -1,4 +1,4 @@
-use super::common::dept_from_host;
+use super::common::{dept_from_host, os_short};
 use super::config::{app_config_dir, validate_config};
 use super::inventory::read_inventory_dir;
 use super::test_support::{count, sample_config, sample_data_dir};
@@ -77,6 +77,12 @@ fn dept_from_host_matches_exact_tokens() {
     assert_eq!(dept_from_host("WS-SECURITY-01"), "Allgemein");
     // Kein bekanntes Segment -> Allgemein.
     assert_eq!(dept_from_host("LAPTOP-123"), "Allgemein");
+}
+
+#[test]
+fn os_short_infers_windows_name_from_known_build_without_caption() {
+    assert_eq!(os_short("", "10.0.22631"), "Win 11 23H2");
+    assert_eq!(os_short("", "19045"), "Win 10 22H2");
 }
 
 #[test]

@@ -3,7 +3,7 @@
   'use strict';
   const H = window.HardView;
   const { $, DEFAULT_THRESHOLDS, TAURI, VIEWS, el, invoke, loadData, renderDrawer,
-    renderKpis, renderRows, renderSegs, renderThead, state, svg, toast } = H;
+    renderKpis, renderList, renderRows, state, svg, toast, ViewModel } = H;
 
   // ---------------- Zuordnungs-Modal ----------------
   async function openAssign(host) {
@@ -100,7 +100,7 @@
         el('p', { style: { color: 'var(--muted)', fontSize: '13px', margin: '0 0 16px' } }, 'Erzeugt eine CSV mit allen Geräten, Spezifikationen, Status und Upgrade-Begründungen — geeignet für Excel und die Beschaffung.'),
         el('div', { style: { display: 'flex', gap: '10px' } },
           el('div', { class: 'btn btn-primary', onclick: doExport }, 'Vollständige Liste exportieren (CSV)'),
-          el('div', { class: 'btn', onclick: () => { state.view = 'warnungen'; applyView(); } }, 'Nur Upgrade-Kandidaten ansehen'))));
+          el('div', { class: 'btn', onclick: () => switchView('warnungen') }, 'Nur Upgrade-Kandidaten ansehen'))));
       return;
     }
 
@@ -227,11 +227,10 @@
       if (!active && bar) bar.remove();
     });
     if (v.list) {
-      if (v.filter) state.filter = v.filter;
       $('#filters').classList.remove('hidden');
       $('#tableView').classList.remove('hidden');
       $('#dashView').classList.add('hidden');
-      renderSegs(); renderThead(); renderRows();
+      renderList();
     } else {
       $('#filters').classList.add('hidden');
       $('#tableView').classList.add('hidden');
@@ -240,14 +239,20 @@
     }
   }
 
+  function switchView(view) {
+    ViewModel.applyViewChange(state, VIEWS, view);
+    $('#drawerMount').innerHTML = '';
+    applyView();
+  }
+
   function renderAll() { renderKpis(); applyView(); }
 
   // ---------------- wire up ----------------
   function wire() {
     document.querySelectorAll('#nav .nav-item').forEach((n) => {
-      n.addEventListener('click', () => { state.view = n.getAttribute('data-view'); state.selected = null; $('#drawerMount').innerHTML = ''; applyView(); });
+      n.addEventListener('click', () => switchView(n.getAttribute('data-view')));
     });
-    $('#searchInput').addEventListener('input', (e) => { state.q = e.target.value.toLowerCase().trim(); renderSegs(); renderRows(); });
+    $('#searchInput').addEventListener('input', (e) => { state.q = e.target.value.toLowerCase().trim(); renderList(); });
     $('#refreshBtn').addEventListener('click', async () => {
       $('#refreshLabel').textContent = 'Lädt …';
       try { await invoke('refresh'); await loadData(); toast('Daten aktualisiert.'); } catch (e) { toast('Aktualisieren fehlgeschlagen: ' + e); }

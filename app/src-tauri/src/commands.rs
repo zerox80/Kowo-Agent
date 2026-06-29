@@ -65,8 +65,8 @@ pub fn get_device(state: State<AppState>, host: String) -> Result<Option<DeviceF
 pub fn get_overview(state: State<AppState>) -> Result<Overview, String> {
     let mut inner = state.inner.lock().map_err(|e| e.to_string())?;
     let th = inner.config.thresholds.clone();
-    let devs = ensure_devices(&mut inner).clone();
-    Ok(store::build_overview(&devs, &th))
+    let devs = ensure_devices(&mut inner);
+    Ok(store::build_overview(devs, &th))
 }
 
 #[tauri::command]
