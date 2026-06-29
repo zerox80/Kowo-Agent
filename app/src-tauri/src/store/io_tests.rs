@@ -228,6 +228,37 @@ fn unknown_disk_and_os_do_not_create_upgrade_reasons() {
 }
 
 #[test]
+fn empty_os_version_falls_back_to_build() {
+    let root = unique_temp_dir("os-build-fallback");
+    let cfg = temp_config(&root);
+    fs::write(&cfg.master_csv_path, "Computer;Benutzer\nWS-BUILD-01;\n").unwrap();
+    fs::write(
+        Path::new(&cfg.data_dir).join("WS-BUILD-01.json"),
+        format!(
+            r#"{{
+  "schemaVersion": 1,
+  "hostname": "WS-BUILD-01",
+  "collectedAtUtc": "{}",
+  "ageYears": 1.0,
+  "cpu": {{"cores": 4, "logicalProcessors": 8, "maxClockMhz": 3000}},
+  "ram": {{"totalGB": 16, "slotsUsed": 1, "slotsTotal": 2}},
+  "disks": [{{"mediaType": "SSD", "sizeGB": 512}}],
+  "os": {{"caption": "", "version": "", "build": "22631"}}
+}}"#,
+            now_iso()
+        ),
+    )
+    .unwrap();
+
+    let devs = build_devices(&cfg);
+    let dev = devs.iter().find(|d| d.host == "WS-BUILD-01").unwrap();
+    assert_eq!(dev.os_build, "22631");
+    assert_eq!(dev.os_short, "Win 11 23H2");
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn mixed_ssd_hdd_is_not_treated_as_full_ssd() {
     let root = unique_temp_dir("mixed-disk");
     let cfg = temp_config(&root);
