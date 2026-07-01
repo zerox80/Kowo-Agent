@@ -1,4 +1,5 @@
 mod ad;
+mod ad_users;
 mod commands;
 mod export;
 mod identity;
@@ -6,6 +7,8 @@ mod model;
 mod store;
 mod upgrade;
 
+#[cfg(test)]
+mod ad_users_tests;
 #[cfg(test)]
 mod commands_tests;
 #[cfg(test)]

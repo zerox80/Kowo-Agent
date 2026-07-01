@@ -182,7 +182,7 @@ pub struct RamStick {
     pub slot: String,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceFull {
     pub host: String,

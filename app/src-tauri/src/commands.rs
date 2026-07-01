@@ -1,6 +1,7 @@
 //! Tauri-Befehle (Bruecke Frontend <-> Backend). Halten Geraeteliste & AD-Cache im State.
 use crate::ad;
-use crate::identity::{current_user_domain, synth_sam};
+use crate::ad_users::{fallback_users_from_devices, filter_and_truncate};
+use crate::identity::current_user_domain;
 use crate::model::*;
 use crate::store;
 use std::collections::BTreeSet;
@@ -137,37 +138,10 @@ pub fn get_ad_users(state: State<AppState>, search: String) -> Result<Vec<AdUser
     if users.is_empty() {
         let mut inner = state.inner.lock().map_err(|e| e.to_string())?;
         let devs = ensure_devices(&mut inner).clone();
-        let mut seen = std::collections::HashSet::new();
-        for d in devs {
-            if d.user_display.is_empty() || d.user_display == "Unbekannt" {
-                continue;
-            }
-            let sam = if d.user_sam.is_empty() {
-                synth_sam(&d.user_display)
-            } else {
-                d.user_sam.clone()
-            };
-            if seen.insert(sam.clone()) {
-                users.push(AdUser {
-                    sam,
-                    display: d.user_display.clone(),
-                    dept: d.dept.clone(),
-                    mail: String::new(),
-                });
-            }
-        }
-        users.sort_by(|a, b| a.display.cmp(&b.display));
+        users = fallback_users_from_devices(&devs);
     }
 
-    if !q.is_empty() {
-        users.retain(|u| {
-            format!("{} {} {} {}", u.display, u.sam, u.dept, u.mail)
-                .to_lowercase()
-                .contains(&q)
-        });
-    }
-    users.truncate(100);
-    Ok(users)
+    Ok(filter_and_truncate(users, &q))
 }
 
 #[tauri::command]

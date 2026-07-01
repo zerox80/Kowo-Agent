@@ -1,8 +1,36 @@
 use super::common::now_iso;
 use super::test_support::{temp_config, unique_temp_dir};
 use super::{build_devices, build_overview};
+use crate::model::{DeviceFull, Thresholds};
 use std::fs;
 use std::path::Path;
+
+fn device(host: &str, status: &str, reasons: Vec<&str>) -> DeviceFull {
+    DeviceFull {
+        host: host.into(),
+        status: status.into(),
+        upgrade_reasons: reasons.into_iter().map(String::from).collect(),
+        has_inventory: true,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn upgrade_needed_and_status_upgrade_diverge_for_stale_with_reasons() {
+    // Regression fuer den Single-Pass-Fold in build_overview: "stale"-Geraete mit
+    // nicht-leeren upgrade_reasons zaehlen in upgrade_needed, aber nicht in status.upgrade.
+    let devs = vec![
+        device("WS-UPGRADE", "upgrade", vec!["RAM knapp (8 GB)"]),
+        device("WS-STALE-REASONS", "stale", vec!["HDD statt SSD"]),
+        device("WS-OK", "ok", vec![]),
+    ];
+    let ov = build_overview(&devs, &Thresholds::default());
+    assert_eq!(ov.status.upgrade, 1, "nur das 'upgrade'-Status-Geraet");
+    assert_eq!(
+        ov.upgrade_needed, 2,
+        "zusaetzlich das 'stale'-Geraet mit Begruendungen"
+    );
+}
 
 #[test]
 fn age_buckets_scale_with_custom_max_age_threshold() {
