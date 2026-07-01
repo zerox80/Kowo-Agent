@@ -17,6 +17,7 @@ pub fn build_overview(devs: &[DeviceFull], th: &Thresholds) -> Overview {
     let mut status_upgrade = 0i64;
     let mut stale = 0i64;
     let mut missing = 0i64;
+    let mut needs_upgrade_total = 0i64;
     let mut dept_map: HashMap<String, (i64, i64)> = HashMap::new();
     for d in devs {
         match d.status.as_str() {
@@ -26,13 +27,16 @@ pub fn build_overview(devs: &[DeviceFull], th: &Thresholds) -> Overview {
             "missing" => missing += 1,
             _ => {}
         }
+        if needs_upgrade(d) {
+            needs_upgrade_total += 1;
+        }
         let e = dept_map.entry(d.dept.clone()).or_insert((0, 0));
         e.0 += 1;
         if needs_action(d) {
             e.1 += 1;
         }
     }
-    let upgrade = devs.iter().filter(|d| needs_upgrade(d)).count() as i64;
+    let upgrade = needs_upgrade_total;
     let aged: Vec<f64> = devs.iter().filter_map(|d| d.age_years).collect();
     let avg = if aged.is_empty() {
         0.0
